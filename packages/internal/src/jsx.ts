@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import type { types } from '@babel/core'
 import traverse from '@babel/traverse'
 
@@ -39,7 +38,7 @@ export const getJsxElements = (ast: types.Node, name: string) => {
  */
 const getJsxAttributes = (jsxElement: types.JSXElement) => {
   return jsxElement.openingElement.attributes.filter(
-    ({ type }) => type === 'JSXAttribute'
+    ({ type }) => type === 'JSXAttribute',
   ) as types.JSXAttribute[]
 }
 
@@ -93,7 +92,7 @@ const reduceJsxElement = (oldNode: JsxElement[], currentNode: types.Node) => {
     currentNode.children.forEach((node) =>
       oldNode.length > 0
         ? reduceJsxElement(element.children, node)
-        : reduceJsxElement(oldNode, node)
+        : reduceJsxElement(oldNode, node),
     )
   }
 

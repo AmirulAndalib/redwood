@@ -1,20 +1,20 @@
-import { LocationProvider } from '@redwoodjs/router'
+import type { TagDescriptor } from '@redwoodjs/web'
 
 import App from './App'
 import { Document } from './Document'
+import Routes from './Routes'
 
 interface Props {
-  url: string
   css: string[]
-  meta?: any[]
+  meta?: TagDescriptor[]
 }
 
-export const ServerEntry: React.FC<Props> = ({ url, css, meta }) => {
+export const ServerEntry: React.FC<Props> = ({ css, meta }) => {
   return (
-    <LocationProvider location={{ pathname: url }}>
-      <Document css={css} meta={meta}>
-        <App />
-      </Document>
-    </LocationProvider>
+    <Document css={css} meta={meta}>
+      <App>
+        <Routes />
+      </App>
+    </Document>
   )
 }

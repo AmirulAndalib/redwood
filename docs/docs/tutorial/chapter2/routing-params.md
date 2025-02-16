@@ -46,7 +46,9 @@ import { Link, routes } from '@redwoodjs/router'
 
 // QUERY, Loading, Empty and Failure definitions...
 
-export const Success = ({ articles }: CellSuccessProps<ArticlesQuery>) => {
+export const Success = ({
+  articles,
+}: CellSuccessProps<ArticlesQuery, ArticlesQueryVariables>) => {
   return (
     <>
       {articles.map((article) => (
@@ -193,7 +195,6 @@ In this case, the path `/article/{id}` doesn't specify the type of `id` - so it 
 
 </ShowForTs>
 
-
 For routes with route parameters, the named route function expects an object where you specify a value for each parameter. If you click on the link now, it will indeed take you to `/article/1` (or `/article/2`, etc, depending on the ID of the post).
 
 You may have noticed that when trying to view the new single-article page that you're getting an error. This is because the boilerplate code included with the page when it was generated includes a link to the page itself—a link which now requires an `id`. Remove the link and your page should be working again:
@@ -203,21 +204,21 @@ You may have noticed that when trying to view the new single-article page that y
 
 ```diff title="web/src/pages/ArticlePage.js"
 - import { Link, routes } from '@redwoodjs/router'
-  import { MetaTags } from '@redwoodjs/web'
+  import { Metadata } from '@redwoodjs/web'
 
   const ArticlePage = () => {
     return (
       <>
-        <MetaTags title="Article" description="Article page" />
+        <Metadata title="Article" description="Article page" />
 
         <h1>ArticlePage</h1>
         <p>
           Find me in <code>./web/src/pages/ArticlePage/ArticlePage.js</code>
         </p>
-        <p>
+        {/*
           My default route is named <code>article</code>, link to me with `
--         <Link to={routes.article()}>Article</Link>`
-        </p>
+          <Link to={routes.article()}>Article</Link>`
+        */}
       </>
     )
   }
@@ -230,21 +231,21 @@ You may have noticed that when trying to view the new single-article page that y
 
 ```diff title="web/src/pages/ArticlePage.tsx"
 - import { Link, routes } from '@redwoodjs/router'
-  import { MetaTags } from '@redwoodjs/web'
+  import { Metadata } from '@redwoodjs/web'
 
   const ArticlePage = () => {
     return (
       <>
-        <MetaTags title="Article" description="Article page" />
+        <Metadata title="Article" description="Article page" />
 
         <h1>ArticlePage</h1>
         <p>
           Find me in <code>./web/src/pages/ArticlePage/ArticlePage.tsx</code>
         </p>
-        <p>
+        {/*
           My default route is named <code>article</code>, link to me with `
--         <Link to={routes.article()}>Article</Link>`
-        </p>
+          <Link to={routes.article()}>Article</Link>`
+        */}
       </>
     )
   }
@@ -269,14 +270,14 @@ And then we'll use that cell in `ArticlePage`:
 <TabItem value="js" label="JavaScript">
 
 ```jsx title="web/src/pages/ArticlePage/ArticlePage.jsx"
-import { MetaTags } from '@redwoodjs/web'
+import { Metadata } from '@redwoodjs/web'
 // highlight-next-line
 import ArticleCell from 'src/components/ArticleCell'
 
 const ArticlePage = () => {
   return (
     <>
-      <MetaTags title="Article" description="Article page" />
+      <Metadata title="Article" description="Article page" />
 
       // highlight-next-line
       <ArticleCell />
@@ -291,14 +292,14 @@ export default ArticlePage
 <TabItem value="ts" label="TypeScript">
 
 ```jsx title="web/src/pages/ArticlePage/ArticlePage.tsx"
-import { MetaTags } from '@redwoodjs/web'
+import { Metadata } from '@redwoodjs/web'
 // highlight-next-line
 import ArticleCell from 'src/components/ArticleCell'
 
 const ArticlePage = () => {
   return (
     <>
-      <MetaTags title="Article" description="Article page" />
+      <Metadata title="Article" description="Article page" />
 
       // highlight-next-line
       <ArticleCell />
@@ -349,10 +350,18 @@ export const Success = ({ article }) => {
 <TabItem value="ts" label="TypeScript">
 
 ```tsx title="web/src/components/ArticleCell/ArticleCell.tsx"
-import type { FindArticleQuery } from 'types/graphql'
-import type { CellSuccessProps, CellFailureProps } from '@redwoodjs/web'
+import type { FindArticleQuery, FindArticleQueryVariables } from 'types/graphql'
 
-export const QUERY = gql`
+import type {
+  CellFailureProps,
+  CellSuccessProps,
+  TypedDocumentNode,
+} from '@redwoodjs/web'
+
+export const QUERY: TypedDocumentNode<
+  FindArticleQuery,
+  FindArticleQueryVariables
+> = gql`
   query FindArticleQuery($id: Int!) {
     // highlight-next-line
     article: post(id: $id) {
@@ -370,11 +379,15 @@ export const Loading = () => <div>Loading...</div>
 
 export const Empty = () => <div>Empty</div>
 
-export const Failure = ({ error }: CellFailureProps) => (
+export const Failure = ({
+  error,
+}: CellFailureProps<FindArticleQueryVariables>) => (
   <div style={{ color: 'red' }}>Error: {error.message}</div>
 )
 
-export const Success = ({ article }: CellSuccessProps<FindArticleQuery, FindArticleQueryVariables>) => {
+export const Success = ({
+  article,
+}: CellSuccessProps<FindArticleQuery, FindArticleQueryVariables>) => {
   return <div>{JSON.stringify(article)}</div>
 }
 ```
@@ -388,14 +401,14 @@ Okay, we're getting closer. Still, where will that `$id` come from? Redwood has 
 <TabItem value="js" label="JavaScript">
 
 ```jsx title="web/src/pages/ArticlePage/ArticlePage.jsx"
-import { MetaTags } from '@redwoodjs/web'
+import { Metadata } from '@redwoodjs/web'
 import ArticleCell from 'src/components/ArticleCell'
 
 // highlight-next-line
 const ArticlePage = ({ id }) => {
   return (
     <>
-      <MetaTags title="Article" description="Article page" />
+      <Metadata title="Article" description="Article page" />
 
       // highlight-next-line
       <ArticleCell id={id} />
@@ -409,8 +422,8 @@ export default ArticlePage
 </TabItem>
 <TabItem value="ts" label="TypeScript">
 
-```jsx title="web/src/pages/ArticlePage/ArticlePage.tsx"
-import { MetaTags } from '@redwoodjs/web'
+```tsx title="web/src/pages/ArticlePage/ArticlePage.tsx"
+import { Metadata } from '@redwoodjs/web'
 import ArticleCell from 'src/components/ArticleCell'
 
 // highlight-start
@@ -423,7 +436,7 @@ interface Props {
 const ArticlePage = ({ id }: Props) => {
   return (
     <>
-      <MetaTags title="Article" description="Article page" />
+      <Metadata title="Article" description="Article page" />
 
       // highlight-next-line
       <ArticleCell id={id} />
@@ -469,7 +482,7 @@ What if you could request the conversion right in the route's path? Introducing 
 </TabItem>
 <TabItem value="ts" label="TypeScript">
 
-```jsx title="web/src/Routes.tsx"
+```tsx title="web/src/Routes.tsx"
 <Route path="/article/{id:Int}" page={ArticlePage} name="article" />
 ```
 
@@ -492,7 +505,7 @@ All of the props you give to the cell will be automatically available as props i
 </TabItem>
 <TabItem value="ts" label="TypeScript">
 
-```jsx
+```tsx
 <ArticleCell id={id} rand={Math.random()} />
 ```
 
@@ -514,8 +527,8 @@ export const Success = ({ article, id, rand }) => {
 <TabItem value="ts" label="TypeScript">
 
 ```tsx
-interface Props extends CellSuccessProps<FindArticleQuery, FindArticleQueryVariables> {
-  id: number
+interface Props
+  extends CellSuccessProps<FindArticleQuery, FindArticleQueryVariables> {
   rand: number
 }
 
@@ -560,7 +573,7 @@ export default Article
 </TabItem>
 <TabItem value="ts" label="TypeScript">
 
-```jsx title="web/src/components/Article/Article.tsx"
+```tsx title="web/src/components/Article/Article.tsx"
 const Article = () => {
   return (
     <div>
@@ -614,7 +627,7 @@ export default Article
 </TabItem>
 <TabItem value="ts" label="TypeScript">
 
-```jsx title="web/src/components/Article/Article.tsx"
+```tsx title="web/src/components/Article/Article.tsx"
 // highlight-next-line
 import { Link, routes } from '@redwoodjs/router'
 
@@ -693,33 +706,43 @@ export const Success = ({ articles }) => {
 </TabItem>
 <TabItem value="ts" label="TypeScript">
 
-```jsx title="web/src/components/ArticlesCell/ArticlesCell.tsx"
+```tsx title="web/src/components/ArticlesCell/ArticlesCell.tsx"
+import type { ArticlesQuery, ArticlesQueryVariables } from 'types/graphql'
+
+import type {
+  CellFailureProps,
+  CellSuccessProps,
+  TypedDocumentNode,
+} from '@redwoodjs/web'
+
 // highlight-next-line
 import Article from 'src/components/Article'
 
-import type { ArticlesQuery } from 'types/graphql'
-import type { CellSuccessProps, CellFailureProps } from '@redwoodjs/web'
-
-export const QUERY = gql`
-  query ArticlesQuery {
-    articles: posts {
-      id
-      title
-      body
-      createdAt
+export const QUERY: TypedDocumentNode<ArticlesQuery, ArticlesQueryVariables> =
+  gql`
+    query ArticlesQuery {
+      articles: posts {
+        id
+        title
+        body
+        createdAt
+      }
     }
-  }
-`
+  `
 
 export const Loading = () => <div>Loading...</div>
 
 export const Empty = () => <div>Empty</div>
 
-export const Failure = ({ error }: CellFailureProps) => (
+export const Failure = ({
+  error,
+}: CellFailureProps<ArticlesQueryVariables>) => (
   <div style={{ color: 'red' }}>Error: {error.message}</div>
 )
 
-export const Success = ({ articles }: CellSuccessProps<ArticlesQuery>) => {
+export const Success = ({
+  articles,
+}: CellSuccessProps<ArticlesQuery, ArticlesQueryVariables>) => {
   return (
     <>
       {articles.map((article) => (
@@ -771,14 +794,22 @@ export const Success = ({ article }) => {
 </TabItem>
 <TabItem value="ts" label="TypeScript">
 
-```jsx title="web/src/components/ArticleCell/ArticleCell.tsx"
+```tsx title="web/src/components/ArticleCell/ArticleCell.tsx"
+import type { FindArticleQuery, FindArticleQueryVariables } from 'types/graphql'
+
+import type {
+  CellFailureProps,
+  CellSuccessProps,
+  TypedDocumentNode,
+} from '@redwoodjs/web'
+
 // highlight-next-line
 import Article from 'src/components/Article'
 
-import type { FindArticleQuery } from 'types/graphql'
-import type { CellSuccessProps, CellFailureProps } from '@redwoodjs/web'
-
-export const QUERY = gql`
+export const QUERY: TypedDocumentNode<
+  FindArticleQuery,
+  FindArticleQueryVariables
+> = gql`
   query FindArticleQuery($id: Int!) {
     article: post(id: $id) {
       id
@@ -793,11 +824,15 @@ export const Loading = () => <div>Loading...</div>
 
 export const Empty = () => <div>Empty</div>
 
-export const Failure = ({ error }: CellFailureProps) => (
+export const Failure = ({
+  error,
+}: CellFailureProps<FindArticleQueryVariables>) => (
   <div style={{ color: 'red' }}>Error: {error.message}</div>
 )
 
-export const Success = ({ article }: CellSuccessProps<FindArticleQuery, FindArticleQueryVariables>) => {
+export const Success = ({
+  article,
+}: CellSuccessProps<FindArticleQuery, FindArticleQueryVariables>) => {
   // highlight-next-line
   return <Article article={article} />
 }
@@ -825,4 +860,3 @@ To recap:
 3. We created a cell to fetch and display the post.
 4. Redwood made the world a better place by making that `id` available to us at several key junctions in our code and even turning it into a number automatically.
 5. We turned the actual post display into a standard React component and used it in both the homepage and new detail page.
-

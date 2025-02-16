@@ -1,6 +1,10 @@
 import type { APIGatewayProxyEvent, Context } from 'aws-lambda'
 import { CurrencyDefinition, CurrencyResolver } from 'graphql-scalars'
 
+import type {
+  RedwoodError as RedwoodErrorType,
+  EmailValidationError as EmailValidationErrorType,
+} from '@redwoodjs/api'
 import { createLogger } from '@redwoodjs/api/logger'
 
 import { createGraphQLHandler } from '../../functions/graphql'
@@ -12,9 +16,12 @@ jest.mock('../../makeMergedSchema', () => {
     ForbiddenError,
     RedwoodGraphQLError,
   } = require('@redwoodjs/graphql-server/dist/errors')
-  const { EmailValidationError, RedwoodError } = require('@redwoodjs/api')
 
   const { CurrencyResolver } = require('graphql-scalars')
+  const { RedwoodError, EmailValidationError } = require('@redwoodjs/api') as {
+    RedwoodError: typeof RedwoodErrorType
+    EmailValidationError: typeof EmailValidationErrorType
+  }
 
   class WeatherError extends RedwoodError {
     constructor(message: string, extensions?: Record<string, any>) {
@@ -80,7 +87,7 @@ jest.mock('../../makeMergedSchema', () => {
             },
             redwoodGraphQLErrorUser: () => {
               throw new RedwoodGraphQLError(
-                'You are forbidden by a RedwoodGraphQLError'
+                'You are forbidden by a RedwoodGraphQLError',
               )
             },
             invalidUser: () => {
@@ -88,7 +95,7 @@ jest.mock('../../makeMergedSchema', () => {
             },
             unexpectedUser: () => {
               throw new Error(
-                'Connection to database failed at 192.168.1 port 5678'
+                'Connection to database failed at 192.168.1 port 5678',
               )
             },
             getUser: (id) => {
@@ -280,7 +287,7 @@ describe('useRedwoodError', () => {
         expect(response.statusCode).toBe(200)
         expect(data).toBeNull()
         expect(errors[0].message).toContain(
-          'Emailmissingatexample.com must be formatted'
+          'Emailmissingatexample.com must be formatted',
         )
       })
     })
@@ -311,7 +318,7 @@ describe('useRedwoodError', () => {
         expect(response.statusCode).toBe(200)
         expect(data).toBeNull()
         expect(errors[0].message).toContain(
-          'You are forbidden by a RedwoodGraphQLError'
+          'You are forbidden by a RedwoodGraphQLError',
         )
       })
     })
@@ -342,7 +349,7 @@ describe('useRedwoodError', () => {
         expect(response.statusCode).toBe(200)
         expect(data).toBeNull()
         expect(errors[0].message).toContain(
-          'You are forbidden by a GraphQLError'
+          'You are forbidden by a GraphQLError',
         )
       })
     })

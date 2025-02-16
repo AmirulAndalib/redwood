@@ -97,7 +97,7 @@ export abstract class BaseNode {
       return this.parent.host
     }
     throw new Error(
-      "Could not find host implementation on root node (you must override the 'host' getter)"
+      "Could not find host implementation on root node (you must override the 'host' getter)",
     )
   }
   exists = true
@@ -142,7 +142,7 @@ export abstract class BaseNode {
     try {
       const d1 = await this._ideInfo()
       const dd = await Promise.all(
-        (await this._children()).map((c) => c.collectIDEInfo(uri))
+        (await this._children()).map((c) => c.collectIDEInfo(uri)),
       )
       const d2 = dd.flat()
       let all = [...d1, ...d2]
@@ -171,7 +171,7 @@ export abstract class BaseNode {
     try {
       const d1 = await this._diagnostics()
       const dd = await Promise.all(
-        (await this._children()).map((c) => c.collectDiagnostics(uri))
+        (await this._children()).map((c) => c.collectDiagnostics(uri)),
       )
       const d2 = dd.flat()
       let all = [...d1, ...d2]
@@ -205,7 +205,6 @@ export abstract class BaseNode {
   }
 
   @lazy() get closestContainingUri(): string | undefined {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { uri } = this as any
     if (uri) {
       return uri
@@ -266,7 +265,7 @@ export abstract class FileNode extends BaseNode {
     if (typeof this.text === 'undefined') {
       throw new Error('undefined file ' + this.filePath)
     }
-    return createTSMSourceFile_cached(this.filePath, this.text!)
+    return createTSMSourceFile_cached(this.filePath, this.text)
   }
   @lazy() get basenameNoExt() {
     return basenameNoExt(this.filePath)

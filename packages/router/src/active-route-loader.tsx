@@ -1,9 +1,9 @@
 import React, { Suspense, useEffect, useRef } from 'react'
 
-import { getAnnouncement, getFocus, resetFocus } from './a11yUtils'
-import { usePageLoadingContext } from './PageLoadingContext'
-import type { Spec } from './util'
-import { inIframe } from './util'
+import { getAnnouncement, getFocus, resetFocus } from './a11yUtils.js'
+import type { Spec } from './page.js'
+import { usePageLoadingContext } from './PageLoadingContext.js'
+import { inIframe } from './util.js'
 
 interface Props {
   path: string
@@ -89,6 +89,9 @@ export const ActiveRouteLoader = ({
     delete params['key']
   }
 
+  // Level 3/3 (ActiveRouteLoader)
+  // This is where we actually render the page component. Either using a
+  // prerender loader or the lazy component
   return (
     <Suspense fallback={<Fallback>{whileLoadingPage?.()}</Fallback>}>
       <LazyRouteComponent {...params} />

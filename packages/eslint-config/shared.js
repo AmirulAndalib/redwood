@@ -32,7 +32,10 @@ module.exports = {
     'jest-dom',
     '@redwoodjs',
   ],
-  ignorePatterns: ['node_modules', 'dist'],
+  // In addition to this, eslint also has some implicit ignore patterns, like
+  // `node_modules`.
+  // See https://eslint.org/docs/latest/use/configure/ignore-deprecated
+  ignorePatterns: ['dist'],
   settings: {
     react: {
       version: 'detect',
@@ -109,8 +112,7 @@ module.exports = {
             //
             // Uses https://github.com/isaacs/minimatch under the hood
             // See https://github.com/isaacs/node-glob#glob-primer for syntax
-            // eslint-disable-next-line prettier/prettier
-            pattern: 'src/*/**/\*.?(sdl.){js,ts}',
+            pattern: 'src/*/**/*.?(sdl.){js,ts}',
             patternOptions: {
               nobrace: true,
               noglobstar: true,
@@ -151,18 +153,14 @@ module.exports = {
       parser: '@typescript-eslint/parser',
       extends: ['plugin:@typescript-eslint/recommended', 'prettier'],
       rules: {
-        '@typescript-eslint/no-var-requires': 'off',
-        '@typescript-eslint/explicit-function-return-type': 'off',
-        '@typescript-eslint/no-empty-interface': 'off',
-        '@typescript-eslint/explicit-module-boundary-types': 'off',
-        '@typescript-eslint/ban-types': 'warn',
-        'no-empty-function': 'off',
+        // TODO: look into enabling these eventually
         '@typescript-eslint/no-empty-function': 'off',
-        camelcase: 'off',
-        '@typescript-eslint/camelcase': 'off',
-        'no-use-before-define': 'off',
-        '@typescript-eslint/no-use-before-define': 'off',
-        '@typescript-eslint/prefer-namespace-keyword': 'off',
+        '@typescript-eslint/prefer-function-type': 'off',
+
+        // Specific 'recommended' rules we alter
+        '@typescript-eslint/no-var-requires': 'off',
+        '@typescript-eslint/no-require-imports': 'off',
+        '@typescript-eslint/no-empty-object-type': 'off',
         '@typescript-eslint/no-unused-vars': [
           'error',
           { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
@@ -193,7 +191,10 @@ module.exports = {
       },
     },
     {
-      files: ['web/src/**/*.routeHooks.{js,ts}'],
+      files: [
+        'web/src/**/*.routeHooks.{js,ts}',
+        'web/src/entry.server.{jsx,tsx}',
+      ],
       rules: { 'no-restricted-imports': 'off' },
     },
   ],

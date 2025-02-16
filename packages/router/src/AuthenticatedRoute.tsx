@@ -1,27 +1,23 @@
 import React, { useCallback } from 'react'
 
-import { Redirect } from './links'
-import { routes } from './router'
-import { useRouterState } from './router-context'
-import type { GeneratedRoutesMap } from './util'
+import type { GeneratedRoutesMap } from './analyzeRoutes.js'
+import { namedRoutes } from './namedRoutes.js'
+import { Redirect } from './redirect.js'
+import { useRouterState } from './router-context.js'
 
 interface AuthenticatedRouteProps {
-  children: React.ReactNode
+  children: React.ReactNode | Thenable<React.ReactNode>
   roles?: string | string[]
-  unauthenticated?: keyof GeneratedRoutesMap
+  unauthenticated: keyof GeneratedRoutesMap
   whileLoadingAuth?: () => React.ReactElement | null
-  private?: boolean
 }
-export const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = (
-  props
-) => {
-  const {
-    private: isPrivate,
-    unauthenticated,
-    roles,
-    whileLoadingAuth,
-    children,
-  } = props
+
+export const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = ({
+  unauthenticated,
+  roles,
+  whileLoadingAuth,
+  children,
+}) => {
   const routerState = useRouterState()
   const {
     loading: authLoading,
@@ -33,15 +29,7 @@ export const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = (
     return !(isAuthenticated && (!roles || hasRole(roles)))
   }, [isAuthenticated, roles, hasRole])
 
-  // Make sure `wrappers` is always an array with at least one wrapper component
-  if (isPrivate && unauthorized()) {
-    if (!unauthenticated) {
-      throw new Error(
-        'Private Sets need to specify what route to redirect unauthorized ' +
-          'users to by setting the `unauthenticated` prop'
-      )
-    }
-
+  if (unauthorized()) {
     if (authLoading) {
       return whileLoadingAuth?.() || null
     } else {
@@ -49,15 +37,18 @@ export const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = (
         globalThis.location.pathname +
         encodeURIComponent(globalThis.location.search)
 
-      // We reassign the type like this, because AvailableRoutes is generated in the user's project
-      if (!(routes as GeneratedRoutesMap)[unauthenticated]) {
+      // We type cast like this, because AvailableRoutes is generated in the
+      // user's project
+      const generatedRoutesMap = namedRoutes as GeneratedRoutesMap
+
+      if (!generatedRoutesMap[unauthenticated]) {
         throw new Error(`We could not find a route named ${unauthenticated}`)
       }
 
       let unauthenticatedPath
 
       try {
-        unauthenticatedPath = (routes as GeneratedRoutesMap)[unauthenticated]()
+        unauthenticatedPath = generatedRoutesMap[unauthenticated]()
       } catch (e) {
         if (
           e instanceof Error &&
@@ -66,12 +57,12 @@ export const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = (
           throw new Error(
             `Redirecting to route "${unauthenticated}" would require route ` +
               'parameters, which currently is not supported. Please choose ' +
-              'a different route'
+              'a different route',
           )
         }
 
         throw new Error(
-          `Could not redirect to the route named ${unauthenticated}`
+          `Could not redirect to the route named ${unauthenticated}`,
         )
       }
 
