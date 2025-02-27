@@ -7,7 +7,7 @@ export default function (
   options: {
     /** absolute path to the `src` directory */
     srcAbsPath: string
-  }
+  },
 ): PluginObj {
   return {
     name: 'babel-plugin-redwood-src-alias',
@@ -34,7 +34,7 @@ export default function (
         if (process.platform === 'win32') {
           newImport = newImport.replaceAll('\\', '/')
         }
-        if (newImport.indexOf('.') !== 0) {
+        if (!newImport.startsWith('.')) {
           newImport = './' + newImport
         }
         const newSource = t.stringLiteral(newImport)

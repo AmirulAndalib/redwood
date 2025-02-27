@@ -4,15 +4,14 @@ import type { PluginObj, types } from '@babel/core'
 
 import type { PagesDependency } from '@redwoodjs/project-config'
 import {
+  ensurePosixPath,
+  getPaths,
   importStatementPath,
   processPagesDir,
-  getPaths,
-  ensurePosixPath,
 } from '@redwoodjs/project-config'
 
-interface PluginOptions {
-  prerender?: boolean
-  vite?: boolean
+export interface PluginOptions {
+  forPrerender?: boolean
 }
 
 /**
@@ -20,7 +19,7 @@ interface PluginOptions {
  * For dev/build/prerender (forJest == false): 'src/pages/ExamplePage' -> './pages/ExamplePage'
  * For test (forJest == true): 'src/pages/ExamplePage' -> '/Users/blah/pathToProject/web/src/pages/ExamplePage'
  */
-const getPathRelativeToSrc = (maybeAbsolutePath: string) => {
+export const getPathRelativeToSrc = (maybeAbsolutePath: string) => {
   // If the path is already relative
   if (!path.isAbsolute(maybeAbsolutePath)) {
     return maybeAbsolutePath
@@ -29,7 +28,7 @@ const getPathRelativeToSrc = (maybeAbsolutePath: string) => {
   return `./${path.relative(getPaths().web.src, maybeAbsolutePath)}`
 }
 
-const withRelativeImports = (page: PagesDependency) => {
+export const withRelativeImports = (page: PagesDependency) => {
   return {
     ...page,
     relativeImport: ensurePosixPath(getPathRelativeToSrc(page.importPath)),
@@ -38,10 +37,30 @@ const withRelativeImports = (page: PagesDependency) => {
 
 export default function (
   { types: t }: { types: typeof types },
-  { prerender = false, vite = false }: PluginOptions
+  { forPrerender = false }: PluginOptions,
 ): PluginObj {
   // @NOTE: This var gets mutated inside the visitors
   let pages = processPagesDir().map(withRelativeImports)
+
+  // Currently processPagesDir() can return duplicate entries when there are multiple files
+  // ending in Page in the individual page directories. This will cause an error upstream.
+  // Here we check for duplicates and throw a more helpful error message.
+  const duplicatePageImportNames = new Set<string>()
+  const sortedPageImportNames = pages.map((page) => page.importName).sort()
+  for (let i = 0; i < sortedPageImportNames.length - 1; i++) {
+    if (sortedPageImportNames[i + 1] === sortedPageImportNames[i]) {
+      duplicatePageImportNames.add(sortedPageImportNames[i])
+    }
+  }
+  if (duplicatePageImportNames.size > 0) {
+    throw new Error(
+      `Unable to find only a single file ending in 'Page.{js,jsx,ts,tsx}' in the following page directories: ${Array.from(
+        duplicatePageImportNames,
+      )
+        .map((name) => `'${name}'`)
+        .join(', ')}`,
+    )
+  }
 
   return {
     name: 'babel-plugin-redwood-routes-auto-loader',
@@ -55,12 +74,15 @@ export default function (
         }
 
         const userImportRelativePath = getPathRelativeToSrc(
-          importStatementPath(p.node.source?.value)
+          importStatementPath(p.node.source?.value),
         )
 
-        const defaultSpecifier = p.node.specifiers.filter((specifiers) =>
-          t.isImportDefaultSpecifier(specifiers)
-        )[0]
+        const defaultSpecifier = p.node.specifiers.find((specifiers) =>
+          t.isImportDefaultSpecifier(specifiers),
+        )
+        if (!defaultSpecifier) {
+          return
+        }
 
         // Remove Page imports in prerender mode (see babel-preset)
         // The removed imports will be replaced further down in this file
@@ -73,7 +95,7 @@ export default function (
         // This is to make sure that all the imported "Page modules" are normal
         // imports and not asynchronous ones.
         // Note that jest in a user's project does not enter this block, but our tests do
-        if (prerender) {
+        if (forPrerender) {
           // Match import paths, const name could be different
 
           const pageThatUserImported = pages.find((page) => {
@@ -89,7 +111,7 @@ export default function (
 
             // Remove the default import for the page and leave all the others
             p.node.specifiers = p.node.specifiers.filter(
-              (specifier) => !t.isImportDefaultSpecifier(specifier)
+              (specifier) => !t.isImportDefaultSpecifier(specifier),
             )
           }
 
@@ -101,7 +123,9 @@ export default function (
           // We use the path & defaultSpecifier because the const name could be anything
           pages = pages.filter(
             (page) =>
-              !(page.relativeImport === ensurePosixPath(userImportRelativePath))
+              !(
+                page.relativeImport === ensurePosixPath(userImportRelativePath)
+              ),
           )
         }
       },
@@ -119,36 +143,28 @@ export default function (
           nodes.unshift(
             t.importDeclaration(
               [t.importSpecifier(t.identifier('lazy'), t.identifier('lazy'))],
-              t.stringLiteral('react')
-            )
+              t.stringLiteral('react'),
+            ),
           )
 
           // Prepend all imports to the top of the file
           for (const { importName, relativeImport } of pages) {
+            const importArgument = t.stringLiteral(relativeImport)
+
             //  const <importName> = {
             //     name: <importName>,
             //     prerenderLoader: (name) => prerenderLoaderImpl
-            //     LazyComponent: lazy(() => import(/* webpackChunkName: "..." */ <relativeImportPath>)
+            //     LazyComponent: lazy(() => import(<relativeImportPath>)
             //   }
 
-            /**
-             * Real example
-             * const LoginPage = {
-             *  name: "LoginPage",
-             *  prerenderLoader: () => __webpack_require__(require.resolveWeak("./pages/LoginPage/LoginPage")), */
-            // LazyComponent: lazy(() => import("/* webpackChunkName: "LoginPage" *//pages/LoginPage/LoginPage.tsx"))
-            /*
-             * }
-             */
-
-            const importArgument = t.stringLiteral(relativeImport)
-
-            importArgument.leadingComments = [
-              {
-                type: 'CommentBlock',
-                value: ` webpackChunkName: "${importName}" `,
-              },
-            ]
+            //
+            // Real example
+            // const LoginPage = {
+            //   name: "LoginPage",
+            //   prerenderLoader: () => __webpack_require__(require.resolveWeak("./pages/LoginPage/LoginPage")),
+            //   LazyComponent: lazy(() => import("/pages/LoginPage/LoginPage.tsx"))
+            // }
+            //
 
             nodes.push(
               t.variableDeclaration('const', [
@@ -157,7 +173,7 @@ export default function (
                   t.objectExpression([
                     t.objectProperty(
                       t.identifier('name'),
-                      t.stringLiteral(importName)
+                      t.stringLiteral(importName),
                     ),
                     // prerenderLoader for ssr/prerender and first load of
                     // prerendered pages in browser (csr)
@@ -166,8 +182,8 @@ export default function (
                       t.identifier('prerenderLoader'),
                       t.arrowFunctionExpression(
                         [t.identifier('name')],
-                        prerenderLoaderImpl(prerender, vite, relativeImport, t)
-                      )
+                        prerenderLoaderImpl(forPrerender, relativeImport, t),
+                      ),
                     ),
                     t.objectProperty(
                       t.identifier('LazyComponent'),
@@ -176,13 +192,13 @@ export default function (
                           [],
                           t.callExpression(t.identifier('import'), [
                             importArgument,
-                          ])
+                          ]),
                         ),
-                      ])
+                      ]),
                     ),
-                  ])
+                  ]),
                 ),
-              ])
+              ]),
             )
           }
 
@@ -195,13 +211,11 @@ export default function (
 }
 
 function prerenderLoaderImpl(
-  prerender: boolean,
-  vite: boolean,
+  forPrerender: boolean,
   relativeImport: string,
-  t: typeof types
+  t: typeof types,
 ) {
-  if (prerender) {
-    // This works for both vite and webpack
+  if (forPrerender) {
     return t.callExpression(t.identifier('require'), [
       t.stringLiteral(relativeImport),
     ])
@@ -213,26 +227,14 @@ function prerenderLoaderImpl(
   // first load of a prerendered page
   // Manually imported pages will be bundled in the main bundle and will be
   // loaded by the code in `normalizePage` in util.ts
-  let implForBuild
-  if (vite) {
-    implForBuild = t.objectExpression([
-      t.objectProperty(
-        t.identifier('default'),
-        t.memberExpression(
-          t.identifier('globalThis.__REDWOOD__PRERENDER_PAGES'),
-          t.identifier('name'),
-          true
-        )
+  return t.objectExpression([
+    t.objectProperty(
+      t.identifier('default'),
+      t.memberExpression(
+        t.identifier('globalThis.__REDWOOD__PRERENDER_PAGES'),
+        t.identifier('name'),
+        true,
       ),
-    ])
-  } else {
-    // Use __webpack_require__ otherwise all pages will be bundled
-    implForBuild = t.callExpression(t.identifier('__webpack_require__'), [
-      t.callExpression(t.identifier('require.resolveWeak'), [
-        t.stringLiteral(relativeImport),
-      ]),
-    ])
-  }
-
-  return implForBuild
+    ),
+  ])
 }

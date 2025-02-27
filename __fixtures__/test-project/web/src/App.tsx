@@ -1,28 +1,25 @@
+import type { ReactNode } from 'react'
+
 import { FatalErrorBoundary, RedwoodProvider } from '@redwoodjs/web'
 import { RedwoodApolloProvider } from '@redwoodjs/web/apollo'
 
-import possibleTypes from 'src/graphql/possibleTypes'
 import FatalErrorPage from 'src/pages/FatalErrorPage'
-import Routes from 'src/Routes'
 
 import { AuthProvider, useAuth } from './auth'
 
-import './scaffold.css'
 import './index.css'
+import './scaffold.css'
 
-const App = () => (
+interface AppProps {
+  children?: ReactNode
+}
+
+const App = ({ children }: AppProps) => (
   <FatalErrorBoundary page={FatalErrorPage}>
     <RedwoodProvider titleTemplate="%PageTitle | %AppTitle">
       <AuthProvider>
-        <RedwoodApolloProvider
-          useAuth={useAuth}
-          graphQLClientConfig={{
-            cacheConfig: {
-              ...possibleTypes,
-            },
-          }}
-        >
-          <Routes />
+        <RedwoodApolloProvider useAuth={useAuth}>
+          {children}
         </RedwoodApolloProvider>
       </AuthProvider>
     </RedwoodProvider>

@@ -1,13 +1,46 @@
+import React from 'react'
 import { Fragment } from 'react'
+
+declare const window: {
+  __REDWOOD__ASSET_MAP: {
+    css?: string[]
+    meta?: TagDescriptor[]
+  }
+} & Window
+
+const extractCssFromAssetMap = () => {
+  if (typeof window !== 'undefined') {
+    return window.__REDWOOD__ASSET_MAP?.css
+  }
+
+  return undefined
+}
+
+const extractMetaFromAssetMap = () => {
+  if (typeof window !== 'undefined') {
+    return window.__REDWOOD__ASSET_MAP?.meta
+  }
+
+  return undefined
+}
+
+function addSlashIfNeeded(path: string): string {
+  if (path.startsWith('http') || path.startsWith('/')) {
+    return path
+  } else {
+    return '/' + path
+  }
+}
+
 /** CSS is a specialised metatag */
 export const Css = ({ css }: { css: string[] }) => {
-  const cssLinks = css || window?.__REDWOOD__ASSET_MAP?.css || []
+  const cssLinks = (css || extractCssFromAssetMap() || []).map(addSlashIfNeeded)
 
   return (
     <>
       {cssLinks.map((cssLink, index) => {
         return (
-          <link rel="stylesheet" key={`css-${index}`} href={`/${cssLink}`} />
+          <link rel="stylesheet" key={`css-${index}`} href={`${cssLink}`} />
         )
       })}
     </>
@@ -80,7 +113,7 @@ interface MetaProps {
 }
 
 export const Meta = ({ tags }: MetaProps) => {
-  const metaTags = tags || window?.__REDWOOD__ASSET_MAP?.meta || []
+  const metaTags = tags || extractMetaFromAssetMap() || []
 
   return (
     <>

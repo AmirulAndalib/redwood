@@ -13,13 +13,13 @@ import type { AuthContextPayload, Decoder } from '@redwoodjs/api'
 import type { CorsConfig } from '@redwoodjs/api'
 import type { RedwoodRealtimeOptions } from '@redwoodjs/realtime'
 
-import type { DirectiveGlobImports } from 'src/directives/makeDirectives'
-
+import type { DirectiveGlobImports } from './directives/makeDirectives'
 import type {
   useRedwoodDirectiveReturn,
   DirectivePluginOptions,
 } from './plugins/useRedwoodDirective'
 import type { LoggerConfig } from './plugins/useRedwoodLogger'
+import type { RedwoodTrustedDocumentOptions } from './plugins/useRedwoodTrustedDocuments'
 
 export type Resolver = (...args: unknown[]) => unknown
 export type Services = {
@@ -57,8 +57,8 @@ export type { useRedwoodDirectiveReturn, DirectivePluginOptions }
 export type GetCurrentUser = (
   decoded: AuthContextPayload[0],
   raw: AuthContextPayload[1],
-  req?: AuthContextPayload[2]
-) => Promise<null | Record<string, unknown> | string>
+  req?: AuthContextPayload[2],
+) => Promise<null | Record<string, unknown>>
 
 export type GenerateGraphiQLHeader = () => string
 
@@ -94,6 +94,10 @@ export interface RedwoodOpenTelemetryConfig {
    * @description Includes the variables in the span attributes.
    */
   result: boolean
+}
+
+export interface RedwoodScalarConfig {
+  File?: boolean
 }
 
 /**
@@ -237,9 +241,25 @@ export type GraphQLYogaOptions = {
   realtime?: RedwoodRealtimeOptions
 
   /**
+   * @description Configure Trusted Documents options
+   *
+   * @see https://benjie.dev/graphql/trusted-documents
+   * @see https://the-guild.dev/graphql/yoga-server/docs/features/persisted-operations
+   */
+  trustedDocuments?: RedwoodTrustedDocumentOptions
+
+  /**
    * @description Configure OpenTelemetry plugin behaviour
    */
   openTelemetryOptions?: RedwoodOpenTelemetryConfig
+
+  /**
+   * @description Configure which scalars to include in the schema. This should match your
+   * `graphql.includeScalars` configuration in `redwood.toml`.
+   *
+   * The default is to include. You must set to `false` to exclude.
+   */
+  includeScalars?: RedwoodScalarConfig
 }
 
 /**
@@ -247,7 +267,7 @@ export type GraphQLYogaOptions = {
  *
  * Note: RedwoodRealtime is not supported
  */
-export type GraphQLHandlerOptions = Omit<GraphQLYogaOptions, 'realtime'>
+export type GraphQLHandlerOptions = GraphQLYogaOptions
 
 export type GraphiQLOptions = Pick<
   GraphQLYogaOptions,

@@ -1,12 +1,13 @@
 import fs from 'fs'
 import path from 'path'
 
-import type { TransformOptions, PluginItem } from '@babel/core'
+import type { PluginItem, PluginOptions, TransformOptions } from '@babel/core'
 import { parseConfigFileTextToJson } from 'typescript'
 
 import { getPaths } from '@redwoodjs/project-config'
 
 import { getWebSideBabelPlugins } from './web'
+import type { Flags as WebFlags } from './web'
 
 const pkgJson = require('../package.json')
 
@@ -17,6 +18,7 @@ export interface RegisterHookOptions {
    */
   plugins?: PluginItem[]
   overrides?: TransformOptions['overrides']
+  options?: WebFlags
 }
 
 interface BabelRegisterOptions extends TransformOptions {
@@ -48,7 +50,7 @@ export const CORE_JS_VERSION = pkgJson.dependencies['core-js']
 
 if (!CORE_JS_VERSION) {
   throw new Error(
-    'RedwoodJS Project Babel: Could not determine core-js version.'
+    'RedwoodJS Project Babel: Could not determine core-js version.',
   )
 }
 
@@ -57,11 +59,11 @@ export const RUNTIME_CORE_JS_VERSION =
 
 if (!RUNTIME_CORE_JS_VERSION) {
   throw new Error(
-    'RedwoodJS Project Babel: Could not determine core-js runtime version'
+    'RedwoodJS Project Babel: Could not determine core-js runtime version',
   )
 }
 
-export const getCommonPlugins = () => {
+export const getCommonPlugins = (): [string, PluginOptions][] => {
   return [
     ['@babel/plugin-transform-class-properties', { loose: true }],
     // Note: The private method loose mode configuration setting must be the
@@ -76,9 +78,7 @@ export const getCommonPlugins = () => {
 // It's related to yarn workspaces to be or not to be
 export const getRouteHookBabelPlugins = () => {
   return [
-    ...getWebSideBabelPlugins({
-      forVite: true,
-    }),
+    ...getWebSideBabelPlugins(),
     [
       'babel-plugin-module-resolver',
       {
@@ -111,7 +111,7 @@ export const parseTypeScriptConfigFiles = () => {
     }
     return parseConfigFileTextToJson(
       configPath,
-      fs.readFileSync(configPath, 'utf-8')
+      fs.readFileSync(configPath, 'utf-8'),
     )
   }
   const apiConfig = parseConfigFile(rwPaths.api.base)
@@ -123,23 +123,39 @@ export const parseTypeScriptConfigFiles = () => {
   }
 }
 
+type CompilerOptionsForPaths = {
+  compilerOptions: { baseUrl: string; paths: Record<string, string[]> }
+}
 /**
  * Extracts and formats the paths from the [ts|js]config.json file
  * @param config The config object
+ * @param rootDir {string} Where the jsconfig/tsconfig is loaded from
  * @returns {Record<string, string>} The paths object
  */
-export const getPathsFromTypeScriptConfig = (config: {
-  compilerOptions: { baseUrl: string; paths: string }
-}): Record<string, string> => {
+export const getPathsFromTypeScriptConfig = (
+  config: CompilerOptionsForPaths,
+  rootDir: string,
+): Record<string, string> => {
   if (!config) {
     return {}
   }
 
-  if (!config.compilerOptions?.baseUrl || !config.compilerOptions?.paths) {
+  if (!config.compilerOptions?.paths) {
     return {}
   }
 
   const { baseUrl, paths } = config.compilerOptions
+
+  let absoluteBase: string
+  if (baseUrl) {
+    // Convert it to absolute path - on windows the baseUrl is already absolute
+    absoluteBase = path.isAbsolute(baseUrl)
+      ? baseUrl
+      : path.join(rootDir, baseUrl)
+  } else {
+    absoluteBase = rootDir
+  }
+
   const pathsObj: Record<string, string> = {}
   for (const [key, value] of Object.entries(paths)) {
     // exclude the default paths that are included in the tsconfig.json file
@@ -151,10 +167,8 @@ export const getPathsFromTypeScriptConfig = (config: {
       continue
     }
     const aliasKey = key.replace('/*', '')
-    const aliasValue = path.join(
-      baseUrl,
-      (value as string)[0].replace('/*', '')
-    )
+    const aliasValue = path.join(absoluteBase, value[0].replace('/*', ''))
+
     pathsObj[aliasKey] = aliasValue
   }
   return pathsObj

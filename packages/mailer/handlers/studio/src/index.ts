@@ -25,13 +25,22 @@ export class StudioMailHandler extends AbstractMailHandler {
   async send(
     renderedContent: MailRenderedContent,
     sendOptions: MailSendOptionsComplete,
-    handlerOptions?: HandlerOptions
+    handlerOptions?: HandlerOptions,
   ): Promise<MailResult> {
-    return this.nodemailerHandler.send(
-      renderedContent,
-      sendOptions,
-      handlerOptions
-    )
+    try {
+      return await this.nodemailerHandler.send(
+        renderedContent,
+        sendOptions,
+        handlerOptions,
+      )
+    } catch (e) {
+      console.error(
+        '\nSent an email to the void! You can view this email during development with Redwood Studio: `yarn rw studio`',
+      )
+      console.error('  ' + (e as Error).message + '\n')
+    }
+
+    return {}
   }
 
   internal() {

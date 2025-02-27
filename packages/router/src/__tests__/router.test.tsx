@@ -1,55 +1,32 @@
-let mockDelay = 0
-jest.mock('../util', () => {
-  const actualUtil = jest.requireActual('../util')
-  const { lazy } = jest.requireActual('react')
-
-  return {
-    ...actualUtil,
-    normalizePage: (specOrPage: Spec | React.ComponentType<unknown>) => ({
-      name: specOrPage.name,
-      prerenderLoader: () => ({ default: specOrPage }),
-      LazyComponent: lazy(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(() => resolve({ default: specOrPage }), mockDelay)
-          )
-      ),
-    }),
-  }
-})
-
 import React, { useEffect, useState } from 'react'
 
-import '@testing-library/jest-dom/extend-expect'
+import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import {
-  act,
-  configure,
-  fireEvent,
-  render,
-  waitFor,
-} from '@testing-library/react'
+  beforeEach,
+  describe,
+  test,
+  beforeAll,
+  afterAll,
+  expect,
+  vi,
+} from 'vitest'
 
-import type { AuthContextInterface } from '@redwoodjs/auth'
+import type { AuthContextInterface, UseAuth } from '@redwoodjs/auth'
 
+import type { GeneratedRoutesMap } from '../analyzeRoutes.js'
 import {
   back,
   routes as generatedRoutes,
   Link,
   navigate,
   Private,
+  PrivateSet,
   Redirect,
   Route,
   Router,
-  usePageLoadingContext,
-} from '../'
-import { useLocation } from '../location'
-import { useParams } from '../params'
-import { Set } from '../Set'
-import type { GeneratedRoutesMap, Spec } from '../util'
-
-/** running into intermittent test timeout behavior in https://github.com/redwoodjs/redwood/pull/4992
- attempting to work around by bumping the default timeout of 5000 */
-const timeoutForFlakeyAsyncTests = 8000
+} from '../index.js'
+import { useParams } from '../params.js'
+import { Set } from '../Set.js'
 
 type UnknownAuthContextInterface = AuthContextInterface<
   unknown,
@@ -70,7 +47,7 @@ type UnknownAuthContextInterface = AuthContextInterface<
 const routes = generatedRoutes as GeneratedRoutesMap
 
 function createDummyAuthContextValues(
-  partial: Partial<UnknownAuthContextInterface>
+  partial: Partial<UnknownAuthContextInterface>,
 ) {
   const authContextValues: UnknownAuthContextInterface = {
     loading: true,
@@ -113,7 +90,7 @@ const mockUseAuth =
       isAuthenticated: false,
       loading: false,
       hasRole: false,
-    }
+    },
   ) =>
   () => {
     const [authLoading, setAuthLoading] = useState(loading)
@@ -142,6 +119,10 @@ const mockUseAuth =
     })
   }
 
+interface LayoutProps {
+  children: React.ReactNode
+}
+
 const HomePage = () => <h1>Home Page</h1>
 const LoginPage = () => <h1>Login Page</h1>
 const AboutPage = () => <h1>About Page</h1>
@@ -159,389 +140,9 @@ const ParamPage = ({ value, q }: { value: string; q: string }) => {
   )
 }
 
-configure({
-  asyncUtilTimeout: 5_000,
-})
-
 beforeEach(() => {
   window.history.pushState({}, '', '/')
   Object.keys(routes).forEach((key) => delete routes[key])
-})
-
-describe('slow imports', () => {
-  const HomePagePlaceholder = () => <>HomePagePlaceholder</>
-  const AboutPagePlaceholder = () => <>AboutPagePlaceholder</>
-  const ParamPagePlaceholder = () => <>ParamPagePlaceholder</>
-  const RedirectPagePlaceholder = () => <>RedirectPagePlaceholder</>
-  const PrivatePagePlaceholder = () => <>PrivatePagePlaceholder</>
-  const LoginPagePlaceholder = () => <>LoginPagePlaceholder</>
-
-  const LocationPage = () => {
-    const location = useLocation()
-
-    return (
-      <>
-        <h1>Location Page</h1>
-        <p>{location.pathname}</p>
-      </>
-    )
-  }
-
-  const PageLoadingContextLayout = ({ children }) => {
-    const { loading } = usePageLoadingContext()
-
-    return (
-      <>
-        <h1>Page Loading Context Layout</h1>
-        {loading && <p>loading in layout...</p>}
-        {!loading && <p>done loading in layout</p>}
-        {children}
-      </>
-    )
-  }
-
-  const PageLoadingContextPage = () => {
-    const { loading } = usePageLoadingContext()
-
-    return (
-      <>
-        <h1>Page Loading Context Page</h1>
-        {loading && <p>loading in page...</p>}
-        {!loading && <p>done loading in page</p>}
-      </>
-    )
-  }
-
-  const TestRouter = ({
-    authenticated,
-    hasRole,
-  }: {
-    authenticated?: boolean
-    hasRole?: boolean
-  }) => (
-    <Router
-      useAuth={mockUseAuth({ isAuthenticated: authenticated, hasRole })}
-      pageLoadingDelay={0}
-    >
-      <Route
-        path="/"
-        page={HomePage}
-        name="home"
-        whileLoadingPage={HomePagePlaceholder}
-      />
-      <Route
-        path="/about"
-        page={AboutPage}
-        name="about"
-        whileLoadingPage={AboutPagePlaceholder}
-      />
-      <Route
-        path="/redirect"
-        page={RedirectPage}
-        name="redirect"
-        whileLoadingPage={RedirectPagePlaceholder}
-      />
-      <Route path="/redirect2/{value}" redirect="/param-test/{value}" />
-      <Route
-        path="/login"
-        page={LoginPage}
-        name="login"
-        whileLoadingPage={LoginPagePlaceholder}
-      />
-      <Private unauthenticated="login">
-        <Route
-          path="/private"
-          page={PrivatePage}
-          name="private"
-          whileLoadingPage={PrivatePagePlaceholder}
-        />
-      </Private>
-      <Private unauthenticated="login" roles="admin">
-        <Route
-          path="/private_with_role"
-          page={PrivatePage}
-          name="private_with_role"
-          whileLoadingPage={PrivatePagePlaceholder}
-        />
-      </Private>
-      <Private unauthenticated="login" roles={['admin', 'moderator']}>
-        <Route
-          path="/private_with_several_roles"
-          page={PrivatePage}
-          name="private_with_several_roles"
-          whileLoadingPage={PrivatePagePlaceholder}
-        />
-      </Private>
-      <Route
-        path="/param-test/{value}"
-        page={ParamPage}
-        name="params"
-        whileLoadingPage={ParamPagePlaceholder}
-      />
-      <Route path="/location" page={LocationPage} name="home" />
-      <Set wrap={PageLoadingContextLayout}>
-        <Route
-          path="/page-loading-context"
-          page={PageLoadingContextPage}
-          name="pageLoadingContext"
-        />
-      </Set>
-      <Route notfound page={NotFoundPage} />
-    </Router>
-  )
-
-  beforeEach(() => {
-    // One of the tests modifies this, so we need to reset it before each test
-    mockDelay = 400
-  })
-
-  afterEach(() => {
-    mockDelay = 0
-  })
-
-  test(
-    'Basic home page',
-    async () => {
-      const screen = render(<TestRouter />)
-
-      await waitFor(() => screen.getByText('HomePagePlaceholder'))
-      await waitFor(() => screen.getByText('Home Page'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'Navigation',
-    async () => {
-      const screen = render(<TestRouter />)
-      // First we should render an empty page while waiting for pageLoadDelay to
-      // pass
-
-      //TODO: implement pageLoadDelay potentially don't need with preloading features
-      // expect(screen.container).toBeEmptyDOMElement()
-
-      // Then we should render whileLoadingPage
-      await waitFor(() => screen.getByText('HomePagePlaceholder'))
-
-      // Finally we should render the actual page
-      await waitFor(() => screen.getByText('Home Page'))
-
-      act(() => navigate('/about'))
-
-      // Now after navigating we should keep rendering the previous page until
-      // the new page has loaded, or until pageLoadDelay has passed. This
-      // ensures we don't show a "white flash", i.e. render an empty page, while
-      // navigating the page
-      expect(screen.container).not.toBeEmptyDOMElement()
-      await waitFor(() => screen.getByText('Home Page'))
-      expect(screen.container).not.toBeEmptyDOMElement()
-
-      // As for HomePage we first render the placeholder...
-      await waitFor(() => screen.getByText('AboutPagePlaceholder'))
-      // ...and then the actual page
-      await waitFor(() => screen.getByText('About Page'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'Redirect page',
-    async () => {
-      act(() => navigate('/redirect'))
-      const screen = render(<TestRouter />)
-      await waitFor(() => screen.getByText('RedirectPagePlaceholder'))
-      await waitFor(() => screen.getByText('About Page'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'Redirect route',
-    async () => {
-      const screen = render(<TestRouter />)
-      await waitFor(() => screen.getByText('HomePagePlaceholder'))
-      await waitFor(() => screen.getByText('Home Page'))
-      act(() => navigate('/redirect2/redirected?q=cue'))
-      await waitFor(() => screen.getByText('ParamPagePlaceholder'))
-      await waitFor(() => screen.getByText('param redirectedcue'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'Private page when not authenticated',
-    async () => {
-      act(() => navigate('/private'))
-      const screen = render(<TestRouter />)
-      await waitFor(() => {
-        expect(
-          screen.queryByText('PrivatePagePlaceholder')
-        ).not.toBeInTheDocument()
-        expect(screen.queryByText('Private Page')).not.toBeInTheDocument()
-        expect(screen.queryByText('LoginPagePlaceholder')).toBeInTheDocument()
-      })
-      await waitFor(() => screen.getByText('Login Page'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'Private page when authenticated',
-    async () => {
-      act(() => navigate('/private'))
-      const screen = render(<TestRouter authenticated={true} />)
-
-      await waitFor(() => screen.getByText('PrivatePagePlaceholder'))
-      await waitFor(() => screen.getByText('Private Page'))
-      await waitFor(() => {
-        expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
-      })
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'Private page when authenticated but does not have the role',
-    async () => {
-      act(() => navigate('/private_with_role'))
-      const screen = render(<TestRouter authenticated={true} hasRole={false} />)
-
-      await waitFor(() => {
-        expect(
-          screen.queryByText('PrivatePagePlaceholder')
-        ).not.toBeInTheDocument()
-        expect(screen.queryByText('Private Page')).not.toBeInTheDocument()
-        expect(screen.queryByText('LoginPagePlaceholder')).toBeInTheDocument()
-      })
-      await waitFor(() => screen.getByText('Login Page'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'Private page when authenticated but does have the role',
-    async () => {
-      act(() => navigate('/private_with_role'))
-      const screen = render(<TestRouter authenticated={true} hasRole={true} />)
-
-      await waitFor(() => {
-        expect(
-          screen.queryByText('PrivatePagePlaceholder')
-        ).not.toBeInTheDocument()
-        expect(screen.queryByText('Private Page')).toBeInTheDocument()
-      })
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'useLocation',
-    async () => {
-      act(() => navigate('/location'))
-      const screen = render(<TestRouter />)
-      await waitFor(() => screen.getByText('Location Page'))
-      await waitFor(() => screen.getByText('/location'))
-
-      act(() => navigate('/about'))
-      // After navigating we will keep rendering the previous page for 100 ms,
-      // (which is our configured delay) before rendering the "whileLoading"
-      // page.
-      // TODO: We don't currently implement page loading delay anymore
-      // await waitFor(() => screen.getByText('Location Page'))
-
-      // And then we'll render the placeholder...
-      await waitFor(() => screen.getByText('AboutPagePlaceholder'))
-      // ...followed by the actual page
-      await waitFor(() => screen.getByText('About Page'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'path params should never be empty',
-    async () => {
-      const PathParamPage = ({ value }) => {
-        expect(value).not.toBeFalsy()
-        return <p>{value}</p>
-      }
-
-      const TestRouter = () => (
-        <Router pageLoadingDelay={100}>
-          <Route
-            path="/about"
-            page={AboutPage}
-            name="about"
-            whileLoadingPage={AboutPagePlaceholder}
-          />
-          <Route
-            path="/path-param-test/{value}"
-            page={PathParamPage}
-            name="params"
-            whileLoadingPage={ParamPagePlaceholder}
-          />
-        </Router>
-      )
-
-      act(() => navigate('/path-param-test/test_value'))
-      const screen = render(<TestRouter />)
-
-      // First we render the path parameter value "test_value"
-      await waitFor(() => screen.getByText('test_value'))
-
-      act(() => navigate('/about'))
-      // After navigating we should keep displaying the old path value...
-      await waitFor(() => screen.getByText('test_value'))
-      // ...until we switch over to render the about page loading component...
-      await waitFor(() => screen.getByText('AboutPagePlaceholder'))
-      // ...followed by the actual page
-      await waitFor(() => screen.getByText('About Page'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
-
-  test(
-    'usePageLoadingContext',
-    async () => {
-      // We want to show a loading indicator if loading pages is taking a long
-      // time. But at the same time we don't want to show it right away, because
-      // then there'll be a flash of the loading indicator on every page load.
-      // So we have a `pageLoadingDelay` delay to control how long it waits
-      // before showing the loading state (default is 1000 ms).
-      //
-      // RW lazy loads pages by default, that's why it could potentially take a
-      // while to load a page. But during tests we don't do that. So we have to
-      // fake a delay. That's what `mockDelay` is for. `mockDelay` has to be
-      // longer than `pageLoadingDelay`, but not too long so the test takes
-      // longer than it has to, and also not too long so the entire test times
-      // out.
-
-      // Had to increase this to make the test pass on Windows
-      mockDelay = 700
-
-      // <TestRouter> sets pageLoadingDelay={200}. (Default is 1000.)
-      const screen = render(<TestRouter />)
-
-      act(() => navigate('/page-loading-context'))
-
-      // 'Page Loading Context Layout' should always be shown
-      await waitFor(() => screen.getByText('Page Loading Context Layout'))
-
-      // 'loading in layout...' should only be shown while the page is loading.
-      // So in this case, for the first 700ms
-      await waitFor(() => screen.getByText('loading in layout...'))
-
-      // After 700ms 'Page Loading Context Page' should be rendered
-      await waitFor(() => screen.getByText('Page Loading Context Page'))
-
-      // This shouldn't show up, because the page shouldn't render before it's
-      // fully loaded
-      expect(screen.queryByText('loading in page...')).not.toBeInTheDocument()
-
-      await waitFor(() => screen.getByText('done loading in page'))
-      await waitFor(() => screen.getByText('done loading in layout'))
-    },
-    timeoutForFlakeyAsyncTests
-  )
 })
 
 describe('inits routes and navigates as expected', () => {
@@ -551,9 +152,9 @@ describe('inits routes and navigates as expected', () => {
       <Route path="/about" page={AboutPage} name="about" />
       <Route path="/redirect" page={RedirectPage} name="redirect" />
       <Route path="/redirect2/{value}" redirect="/param-test/{value}" />
-      <Private unauthenticated="home">
+      <PrivateSet unauthenticated="home">
         <Route path="/private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
       <Route path="/param-test/{value}" page={ParamPage} name="params" />
       <Route notfound page={NotFoundPage} />
     </Router>
@@ -644,14 +245,14 @@ describe('test params escaping', () => {
   test('Params with unreserved characters work in path and query', async () => {
     const screen = getScreen()
     act(() =>
-      navigate(routes.params({ value: 'example.com', q: 'example.com' }))
+      navigate(routes.params({ value: 'example.com', q: 'example.com' })),
     )
     await waitFor(() => {
       expect(
-        screen.queryByText('param example.comexample.com')
+        screen.queryByText('param example.comexample.com'),
       ).toBeInTheDocument()
       expect(
-        screen.queryByText('hookparams example.com?example.com')
+        screen.queryByText('hookparams example.com?example.com'),
       ).toBeInTheDocument()
     })
   })
@@ -659,15 +260,15 @@ describe('test params escaping', () => {
   test('Params with reserved characters work in path and query', async () => {
     const screen = getScreen()
     act(() =>
-      navigate(routes.params({ value: 'example!com', q: 'example!com' }))
+      navigate(routes.params({ value: 'example!com', q: 'example!com' })),
     )
 
     await waitFor(() => {
       expect(
-        screen.queryByText('param example!comexample!com')
+        screen.queryByText('param example!comexample!com'),
       ).toBeInTheDocument()
       expect(
-        screen.queryByText('hookparams example!com?example!com')
+        screen.queryByText('hookparams example!com?example!com'),
       ).toBeInTheDocument()
     })
   })
@@ -675,15 +276,15 @@ describe('test params escaping', () => {
   test('Params with unsafe characters work in query, are escaped in path', async () => {
     const screen = getScreen()
     act(() =>
-      navigate(routes.params({ value: 'example com', q: 'example com' }))
+      navigate(routes.params({ value: 'example com', q: 'example com' })),
     )
 
     await waitFor(() => {
       expect(
-        screen.queryByText('param example%20comexample com')
+        screen.queryByText('param example%20comexample com'),
       ).toBeInTheDocument()
       expect(
-        screen.queryByText('hookparams example%20com?example com')
+        screen.queryByText('hookparams example%20com?example com'),
       ).toBeInTheDocument()
     })
   })
@@ -695,7 +296,7 @@ describe('test params escaping', () => {
     await waitFor(() => {
       expect(screen.queryByText('param exampleexample/com')).toBeInTheDocument()
       expect(
-        screen.queryByText('hookparams example?example/com')
+        screen.queryByText('hookparams example?example/com'),
       ).toBeInTheDocument()
     })
   })
@@ -703,7 +304,7 @@ describe('test params escaping', () => {
   test('Character / is not captured as part of a param in path', async () => {
     const screen = getScreen()
     act(() =>
-      navigate(routes.params({ value: 'example/com', q: 'example/com' }))
+      navigate(routes.params({ value: 'example/com', q: 'example/com' })),
     )
 
     await waitFor(() => screen.getByText('404'))
@@ -762,9 +363,9 @@ test('unauthenticated user is redirected away from private page', async () => {
       <Route path="/" page={HomePage} name="home" />
       <Route path="/login" page={LoginPage} name="login" />
       <Route path="/about" page={AboutPage} name="about" />
-      <Private unauthenticated="login">
+      <PrivateSet unauthenticated="login">
         <Route path="/private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
     </Router>
   )
   const screen = render(<TestRouter />)
@@ -789,9 +390,9 @@ test('unauthenticated user is redirected including search params', async () => {
     <Router>
       <Route path="/" page={HomePage} name="home" />
       <Route path="/login" page={LoginPage} name="login" />
-      <Private unauthenticated="login">
+      <PrivateSet unauthenticated="login">
         <Route path="/private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
     </Router>
   )
   const screen = render(<TestRouter />)
@@ -807,7 +408,7 @@ test('unauthenticated user is redirected including search params', async () => {
     expect(screen.queryByText(/Private Page/i)).not.toBeInTheDocument()
     expect(window.location.pathname).toBe('/login')
     expect(window.location.search).toBe(
-      `?redirectTo=/private${encodeURIComponent('?bazinga=yeah')}`
+      `?redirectTo=/private${encodeURIComponent('?bazinga=yeah')}`,
     )
     screen.getByText(/Login Page/i)
   })
@@ -817,9 +418,9 @@ test('authenticated user can access private page', async () => {
   const TestRouter = () => (
     <Router useAuth={mockUseAuth({ isAuthenticated: true })}>
       <Route path="/" page={HomePage} name="home" />
-      <Private unauthenticated="home">
+      <PrivateSet unauthenticated="home">
         <Route path="/private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
     </Router>
   )
   const screen = render(<TestRouter />)
@@ -840,12 +441,12 @@ test('can display a loading screen whilst waiting for auth', async () => {
   const TestRouter = () => (
     <Router useAuth={mockUseAuth({ isAuthenticated: false, loading: true })}>
       <Route path="/" page={HomePage} name="home" />
-      <Private
+      <PrivateSet
         unauthenticated="home"
         whileLoadingAuth={() => <>Authenticating...</>}
       >
         <Route path="/private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
     </Router>
   )
   const screen = render(<TestRouter />)
@@ -883,9 +484,9 @@ test('can display a loading screen with a hook', async () => {
       })}
     >
       <Route path="/" page={HomePage} name="home" />
-      <Private unauthenticated="home" whileLoadingAuth={HookLoader}>
+      <PrivateSet unauthenticated="home" whileLoadingAuth={HookLoader}>
         <Route path="/private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
     </Router>
   )
   const screen = render(<TestRouter />)
@@ -914,14 +515,14 @@ test('inits routes two private routes with a space in between and loads as expec
       <Route path="/" page={HomePage} name="home" />
       <Route path="/about" page={AboutPage} name="about" />
       <Route path="/redirect" page={RedirectPage} name="redirect" />
-      <Private unauthenticated="home">
+      <PrivateSet unauthenticated="home">
         <Route path="/private" page={PrivatePage} name="private" />{' '}
         <Route path="/another-private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
 
       <Route
         path="/param-test/:value"
-        page={({ value }) => <div>param {value}</div>}
+        page={({ value }: { value: string }) => <div>param {value}</div>}
         name="params"
       />
     </Router>
@@ -933,7 +534,7 @@ test('inits routes two private routes with a space in between and loads as expec
 })
 
 test('supports <Set>', async () => {
-  const GlobalLayout = ({ children }) => (
+  const GlobalLayout = ({ children }: LayoutProps) => (
     <div>
       <h1>Global Layout</h1>
       {children}
@@ -946,14 +547,14 @@ test('supports <Set>', async () => {
         <Route path="/" page={HomePage} name="home" />
         <Route path="/about" page={AboutPage} name="about" />
         <Route path="/redirect" page={RedirectPage} name="redirect" />
-        <Private unauthenticated="home">
+        <PrivateSet unauthenticated="home">
           <Route path="/private" page={PrivatePage} name="private" />
           <Route
             path="/another-private"
             page={PrivatePage}
             name="anotherPrivate"
           />
-        </Private>
+        </PrivateSet>
       </Set>
     </Router>
   )
@@ -964,7 +565,7 @@ test('supports <Set>', async () => {
 })
 
 test('can use named routes for navigating', async () => {
-  const MainLayout = ({ children }) => {
+  const MainLayout = ({ children }: LayoutProps) => {
     return (
       <div>
         <h1>Main Layout</h1>
@@ -996,7 +597,7 @@ test('can use named routes for navigating', async () => {
 })
 
 test('renders only active path', async () => {
-  const AboutLayout = ({ children }) => {
+  const AboutLayout = ({ children }: LayoutProps) => {
     return (
       <div>
         <h1>About Layout</h1>
@@ -1006,7 +607,7 @@ test('renders only active path', async () => {
     )
   }
 
-  const LoginLayout = ({ children }) => {
+  const LoginLayout = ({ children }: LayoutProps) => {
     return (
       <div>
         <h1>Login Layout</h1>
@@ -1097,7 +698,7 @@ test('renders first matching route only, even if multiple routes have the same n
   expect(screen.queryByText('About Two Page')).not.toBeInTheDocument()
 })
 
-test('renders first matching route only, also with Private', async () => {
+test('renders first matching route only, also with PrivateSet', async () => {
   const ParamPage = ({ param }: { param: string }) => <div>param {param}</div>
 
   const TestRouter = () => (
@@ -1105,9 +706,9 @@ test('renders first matching route only, also with Private', async () => {
       <Route path="/" page={HomePage} name="home" />
       <Route path="/login" page={LoginPage} name="login" />
       <Route path="/about" page={AboutPage} name="about" />
-      <Private unauthenticated="login">
+      <PrivateSet unauthenticated="login">
         <Route path="/{param}" page={ParamPage} name="param" />
-      </Private>
+      </PrivateSet>
     </Router>
   )
 
@@ -1121,15 +722,15 @@ test('renders first matching route only, also with Private', async () => {
   expect(screen.queryByText(/param/)).not.toBeInTheDocument()
 })
 
-test('renders first matching route only, also with param path outside Private', async () => {
+test('renders first matching route only, also with param path outside PrivateSet', async () => {
   const ParamPage = ({ param }: { param: string }) => <div>param {param}</div>
 
   const TestRouter = () => (
     <Router useAuth={mockUseAuth({ isAuthenticated: true })}>
       <Route path="/" page={HomePage} name="home" />
-      <Private unauthenticated="login">
+      <PrivateSet unauthenticated="login">
         <Route path="/private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
       <Route path="/{param}" page={ParamPage} name="param" />
     </Router>
   )
@@ -1166,10 +767,10 @@ test('params should never be an empty object in Set', async () => {
     return <div>Param Page</div>
   }
 
-  const SetWithUseParams = ({ children }) => {
+  const SetWithUseParams = ({ children }: LayoutProps) => {
     const params = useParams()
     expect(params).not.toEqual({})
-    return children
+    return <>{children}</>
   }
 
   const TestRouter = () => (
@@ -1191,12 +792,12 @@ test('params should never be an empty object in Set with waitFor (I)', async () 
     return <>documentId: {documentId}</>
   }
 
-  const SetWithUseParams = ({ children }) => {
+  const SetWithUseParams = ({ children }: LayoutProps) => {
     const params = useParams()
     // 1st run: { documentId: '1' }
     // 2nd run: { documentId: '2' }
     expect(params).not.toEqual({})
-    return children
+    return <>{children}</>
   }
 
   const TestRouter = () => (
@@ -1221,12 +822,12 @@ test('params should never be an empty object in Set without waitFor (II)', async
     return <>documentId: {documentId}</>
   }
 
-  const SetWithUseParams = ({ children }) => {
+  const SetWithUseParams = ({ children }: LayoutProps) => {
     const params = useParams()
     // 1st run: { documentId: '1' }
     // 2nd run: { documentId: '2' }
     expect(params).not.toEqual({})
-    return children
+    return <>{children}</>
   }
 
   const TestRouter = () => (
@@ -1251,17 +852,17 @@ test('Set is not rendered for unauthenticated user.', async () => {
     return null
   }
 
-  const SetWithUseParams = ({ children }) => {
+  const SetWithUseParams = ({ children }: LayoutProps) => {
     // This should never be called. We should be redirected to login instead.
     expect(false).toBe(true)
-    return children
+    return <>{children}</>
   }
 
   const TestRouter = () => (
     <Router>
-      <Set private wrap={SetWithUseParams} unauthenticated="login">
+      <PrivateSet wrap={SetWithUseParams} unauthenticated="login">
         <Route path="/test/{documentId}" page={ParamPage} name="param" />
-      </Set>
+      </PrivateSet>
       <Route path="/" page={HomePage} name="home" />
       <Route path="/login" page={() => <div>auth thyself</div>} name="login" />
     </Router>
@@ -1284,14 +885,16 @@ test('Set is not rendered for unauthenticated user on direct navigation', async 
     return null
   }
 
-  const SetWithUseParams = ({ children }) => {
+  const SetWithUseParams = ({ children }: LayoutProps) => {
     // This should never be called. We should be redirected to login instead.
     expect(false).toBe(true)
-    return children
+    return <>{children}</>
   }
 
   const TestRouter = () => (
     <Router>
+      {/* Keeping this around so we don't accidentally break the `private` prop
+      on Set until we're ready to remove it */}
       <Set private wrap={SetWithUseParams} unauthenticated="login">
         <Route path="/test/{documentId}" page={ParamPage} name="param" />
       </Set>
@@ -1305,8 +908,14 @@ test('Set is not rendered for unauthenticated user on direct navigation', async 
   await waitFor(() => screen.getByText(/auth thyself/))
 })
 
+// TODO: Remove this entire test once we remove the `<Private>` component
 test('Private is an alias for Set private', async () => {
-  const PrivateLayout = ({ children, theme }) => (
+  interface PrivateLayoutProps {
+    children: React.ReactNode
+    theme: string
+  }
+
+  const PrivateLayout = ({ children, theme }: PrivateLayoutProps) => (
     <div>
       <h1>Private Layout ({theme})</h1>
       {children}
@@ -1316,7 +925,11 @@ test('Private is an alias for Set private', async () => {
   const TestRouter = () => (
     <Router useAuth={mockUseAuth({ isAuthenticated: true })}>
       <Route path="/" page={HomePage} name="home" />
-      <Private wrap={PrivateLayout} unauthenticated="home" theme="dark">
+      <Private<PrivateLayoutProps>
+        wrap={PrivateLayout}
+        unauthenticated="home"
+        theme="dark"
+      >
         <Route path="/private" page={PrivatePage} name="private" />
       </Private>
     </Router>
@@ -1335,9 +948,9 @@ test('redirect to last page', async () => {
     <Router>
       <Route path="/" page={HomePage} name="home" />
       <Route path="/about" page={AboutPage} name="about" />
-      <Private unauthenticated="login">
+      <PrivateSet unauthenticated="login">
         <Route path="/private" page={PrivatePage} name="private" />
-      </Private>
+      </PrivateSet>
       <Route path="/login" page={LoginPage} name="login" />
     </Router>
   )
@@ -1403,7 +1016,7 @@ test('jump to new route, then go back', async () => {
 })
 
 test('redirect replacing route', async () => {
-  const ListWithDefaultParamsPage = (props) => {
+  const ListWithDefaultParamsPage = (props: { _limit: string }) => {
     if (props['_limit']) {
       return <h1>List Page</h1>
     }
@@ -1548,48 +1161,48 @@ test('should handle ref and key as search params', async () => {
 })
 
 describe('Unauthorized redirect error messages', () => {
-  let err
+  let err: typeof console.error
 
   beforeAll(() => {
     err = console.error
-    console.error = jest.fn()
+    console.error = vi.fn()
   })
 
   afterAll(() => {
     console.error = err
   })
 
-  test('Private set with unauthenticated prop with nonexisting page', async () => {
+  test('PrivateSet with unauthenticated prop with nonexisting page', async () => {
     const TestRouter = ({ authenticated }: { authenticated?: boolean }) => (
       <Router useAuth={mockUseAuth({ isAuthenticated: authenticated })}>
         <Route path="/" page={HomePage} name="home" />
-        <Set private unauthenticated="does-not-exist">
+        <PrivateSet unauthenticated="does-not-exist">
           <Route path="/private" page={PrivatePage} name="private" />
-        </Set>
+        </PrivateSet>
       </Router>
     )
 
     act(() => navigate('/private'))
     expect(() => render(<TestRouter authenticated={false} />)).toThrow(
-      'We could not find a route named does-not-exist'
+      'We could not find a route named does-not-exist',
     )
   })
 
-  test('Private set redirecting to page that needs parameters', async () => {
+  test('PrivateSet redirecting to page that needs parameters', async () => {
     const TestRouter = ({ authenticated }: { authenticated?: boolean }) => (
       <Router useAuth={mockUseAuth({ isAuthenticated: authenticated })}>
         <Route path="/" page={HomePage} name="home" />
         <Route path="/param-test/{value}" page={ParamPage} name="params" />
-        <Set private unauthenticated="params">
+        <PrivateSet unauthenticated="params">
           <Route path="/private" page={PrivatePage} name="private" />
-        </Set>
+        </PrivateSet>
       </Router>
     )
 
     act(() => navigate('/private'))
     expect(() => render(<TestRouter authenticated={false} />)).toThrow(
       'Redirecting to route "params" would require route parameters, which ' +
-        'currently is not supported. Please choose a different route'
+        'currently is not supported. Please choose a different route',
     )
   })
 })
@@ -1600,51 +1213,48 @@ describe('Multiple nested private sets', () => {
   const PrivateEmployeePage = () => <h1>Private Employee Page</h1>
   const PrivateAdminPage = () => <h1>Private Admin Page</h1>
 
-  const LevelLayout = ({ children, level }) => (
+  interface LevelLayoutProps {
+    children: React.ReactNode
+    level: string
+  }
+
+  const LevelLayout = ({ children, level }: LevelLayoutProps) => (
     <div>
       Level: {level}
       {children}
     </div>
   )
 
-  const TestRouter = ({ useAuthMock }) => (
+  const TestRouter = ({ useAuthMock }: { useAuthMock: UseAuth }) => (
     <Router useAuth={useAuthMock}>
       <Route path="/" page={HomePage} name="home" />
-      <Set unauthenticated="home" level="1" wrap={LevelLayout} private>
+      <PrivateSet<LevelLayoutProps>
+        unauthenticated="home"
+        level="1"
+        wrap={LevelLayout}
+      >
         <Route
           path="/no-roles-assigned"
           page={PrivateNoRolesAssigned}
           name="noRolesAssigned"
         />
-        <Set
-          private
+        <PrivateSet
           unauthenticated="noRolesAssigned"
           roles={['ADMIN', 'EMPLOYEE']}
-          level="2"
         >
-          <Set
-            unauthenticated="privateAdmin"
-            roles={['EMPLOYEE']}
-            level="3"
-            private
-          >
+          <PrivateSet unauthenticated="privateAdmin" roles={['EMPLOYEE']}>
             <Route
               path="/employee"
               page={PrivateEmployeePage}
               name="privateEmployee"
             />
-          </Set>
+          </PrivateSet>
 
-          <Set
-            unauthenticated="privateEmployee"
-            roles={['ADMIN']}
-            level="3"
-            private
-          >
+          <PrivateSet unauthenticated="privateEmployee" roles={['ADMIN']}>
             <Route path="/admin" page={PrivateAdminPage} name="privateAdmin" />
-          </Set>
-        </Set>
-      </Set>
+          </PrivateSet>
+        </PrivateSet>
+      </PrivateSet>
     </Router>
   )
 
@@ -1655,7 +1265,7 @@ describe('Multiple nested private sets', () => {
           isAuthenticated: true,
           hasRole: false,
         })}
-      />
+      />,
     )
 
     act(() => navigate('/employee'))
@@ -1673,7 +1283,7 @@ describe('Multiple nested private sets', () => {
           isAuthenticated: false,
           hasRole: false,
         })}
-      />
+      />,
     )
 
     act(() => navigate('/employee'))
@@ -1693,13 +1303,12 @@ describe('Multiple nested private sets', () => {
             return role.includes('ADMIN')
           },
         })}
-      />
+      />,
     )
 
     act(() => navigate('/admin'))
     await waitFor(() => {
       expect(screen.queryByText(`Private Admin Page`)).toBeInTheDocument()
-      expect(screen.queryByText(`Level: 3`)).toBeInTheDocument()
     })
   })
 
@@ -1712,23 +1321,29 @@ describe('Multiple nested private sets', () => {
             return role.includes('ADMIN')
           },
         })}
-      />
+      />,
     )
 
     act(() => navigate('/admin'))
 
     await waitFor(() => {
       expect(screen.queryByText(`Private Admin Page`)).toBeInTheDocument()
-      expect(screen.queryByText(`Level: 3`)).toBeInTheDocument()
     })
   })
 })
 
-describe('Multiple nested private sets', () => {
+describe('Multiple nested sets', () => {
   const HomePage = () => <h1>Home Page</h1>
   const Page = () => <h1>Page</h1>
 
-  const DebugLayout = (props) => {
+  interface DebugLayoutProps {
+    children: React.ReactNode
+    theme: string
+    otherProp?: string
+    level: string
+  }
+
+  const DebugLayout = (props: DebugLayoutProps) => {
     return (
       <div>
         <p>Theme: {props.theme}</p>
@@ -1742,7 +1357,7 @@ describe('Multiple nested private sets', () => {
   const TestRouter = () => (
     <Router>
       <Route path="/" page={HomePage} name="home" />
-      <Set level="1" theme="blue" wrap={DebugLayout}>
+      <Set<DebugLayoutProps> level="1" theme="blue" wrap={DebugLayout}>
         <Route path="/level1" page={Page} name="level1" />
         <Set level="2" theme="red" otherProp="bazinga">
           <Route path="/level2" page={Page} name="level2" />
@@ -1755,25 +1370,27 @@ describe('Multiple nested private sets', () => {
   )
 
   test('level 1, matches expected props', async () => {
-    const screen = render(<TestRouter />)
-
     act(() => navigate('/level1'))
 
+    const screen = render(<TestRouter />)
+
     await waitFor(() => {
-      expect(screen.queryByText(`Theme: blue`)).toBeInTheDocument()
-      expect(screen.queryByText(`Page Level: 1`)).toBeInTheDocument()
+      expect(screen.queryByText('Theme: blue')).toBeInTheDocument()
+      expect(screen.queryByText('Other Prop:')).toBeInTheDocument()
+      expect(screen.queryByText('Page Level: 1')).toBeInTheDocument()
     })
   })
 
-  test('level 2, should override level 1', async () => {
-    const screen = render(<TestRouter />)
-
+  test('level 2, should not affect level 1 set props', async () => {
     act(() => navigate('/level2'))
 
+    const screen = render(<TestRouter />)
+
     await waitFor(() => {
-      expect(screen.queryByText(`Theme: red`)).toBeInTheDocument()
-      expect(screen.queryByText(`Other Prop: bazinga`)).toBeInTheDocument()
-      expect(screen.queryByText(`Page Level: 2`)).toBeInTheDocument()
+      expect(screen.queryByText('Page')).toBeInTheDocument()
+      expect(screen.queryByText('Theme: blue')).toBeInTheDocument()
+      expect(screen.queryByText('Other Prop:')).toBeInTheDocument()
+      expect(screen.queryByText('Page Level: 1')).toBeInTheDocument()
     })
   })
 
@@ -1783,9 +1400,9 @@ describe('Multiple nested private sets', () => {
     act(() => navigate('/level3'))
 
     await waitFor(() => {
-      expect(screen.queryByText(`Theme: green`)).toBeInTheDocument()
-      expect(screen.queryByText(`Other Prop: bazinga`)).toBeInTheDocument()
-      expect(screen.queryByText(`Page Level: 3`)).toBeInTheDocument()
+      expect(screen.queryByText('Theme: blue')).toBeInTheDocument()
+      expect(screen.queryByText('Other Prop:')).toBeInTheDocument()
+      expect(screen.queryByText('Page Level: 1')).toBeInTheDocument()
     })
   })
 })

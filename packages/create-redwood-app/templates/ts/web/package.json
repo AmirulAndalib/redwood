@@ -11,15 +11,15 @@
     ]
   },
   "dependencies": {
-    "@redwoodjs/forms": "6.0.7",
-    "@redwoodjs/router": "6.0.7",
-    "@redwoodjs/web": "6.0.7",
-    "react": "0.0.0-experimental-e5205658f-20230913",
-    "react-dom": "0.0.0-experimental-e5205658f-20230913"
+    "@redwoodjs/forms": "8.0.0",
+    "@redwoodjs/router": "8.0.0",
+    "@redwoodjs/web": "8.0.0",
+    "react": "19.0.0-rc-f2df5694-20240916",
+    "react-dom": "19.0.0-rc-f2df5694-20240916"
   },
   "devDependencies": {
-    "@types/react": "18.2.14",
-    "@types/react-dom": "18.2.6",
-    "@redwoodjs/vite": "6.0.7"
+    "@redwoodjs/vite": "8.0.0",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19"
   }
 }
