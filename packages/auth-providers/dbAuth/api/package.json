@@ -66,14 +66,14 @@
     "@arethetypeswrong/cli": "0.16.4",
     "@redwoodjs/api": "workspace:*",
     "@redwoodjs/framework-tools": "workspace:*",
-    "@simplewebauthn/server": "7.4.0",
+    "@simplewebauthn/server": "13.3.2",
     "@types/md5": "2.3.5",
     "@types/uuid": "10.0.0",
     "concurrently": "8.2.2",
     "publint": "0.3.12",
     "tsx": "4.19.2",
     "typescript": "5.6.2",
-    "vitest": "2.1.9"
+    "vitest": "5.0.5"
   },
   "gitHead": "3905ed045508b861b495f8d5630d76c7a157d8f1"
 }
